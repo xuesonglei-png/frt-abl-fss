@@ -1,0 +1,47 @@
+{
+  "protocol_version": "frt-abl-robustness-v1",
+  "baseline": {
+    "method_version": "frt-abl-v10-20261028",
+    "variant": "full",
+    "runs_root": "methods/frt_abl/runs-v10"
+  },
+  "seeds": [0, 1, 2, 3, 4],
+  "split": "validation",
+  "output_root": "methods/frt_abl/runs-robustness-core-5seed",
+  "summary_root": "methods/frt_abl/runs-summary-robustness-core-5seed",
+  "noise": {
+    "kind": "gaussian",
+    "seed_salt": "frt-abl-robustness-v1",
+    "levels": {
+      "gaussian": [0.0, 0.05, 0.1],
+      "salt_pepper": [0.0]
+    }
+  },
+  "knowledge": {
+    "levels": [0.0, 0.3],
+    "units": {
+      "mnist-add2": "100 ordered addition facts (a,b) in Z_10 x Z_10",
+      "hwf": "36 operator-application cells (op, right operand digit 1..9); eval-only extension"
+    }
+  },
+  "search_budget": {
+    "levels": [1.0],
+    "mnist-add2": {
+      "beam_size": [256],
+      "max_checks": [100]
+    },
+    "hwf": {
+      "beam_size": [256],
+      "max_checks": [512]
+    }
+  },
+  "combined": {
+    "noise_sigma": [0.05, 0.1],
+    "knowledge_ratio": [0.3],
+    "budget_scale": [1.0]
+  },
+  "notes": [
+    "Core single-factor multi-seed robustness subset: clean, Gaussian noise sigma 0.05 and 0.10, and 30% masked knowledge.",
+    "Five frozen v10 full checkpoints per task; validation only; no training and no formal test access."
+  ]
+}

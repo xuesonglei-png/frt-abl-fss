@@ -1,0 +1,398 @@
+{
+  "protocol_version": "frt-abl-comparison-v1",
+  "track": "COMPARISON_ADOPTED_NATIVE",
+  "seeds": [0, 1, 2, 3, 4],
+  "primary": {
+    "method": "frt_abl",
+    "display": "FRT-ABL (V10)",
+    "method_version": "frt-abl-v10-20261028",
+    "summary": "methods/frt_abl/runs-summary-v10-5seed/summary.json",
+    "variants": ["full"],
+    "split": "validation",
+    "data_protocol": "common-mnist-add2-v1",
+    "supervision": "sum+1620-digit-labels",
+    "selection": "best-validation-epoch",
+    "identity_by_task": {
+      "hwf": {
+        "data_protocol": "hwf-label-budget-v1",
+        "supervision": "expression+1620-symbol-labels"
+      }
+    },
+    "test_evaluations": []
+  },
+  "tasks": {
+    "mnist-add2": {
+      "display": "MNIST 两图加法",
+      "family": "MNIST addition",
+      "unit": "pair",
+      "target": "两张数字图之和 0..18",
+      "order": 1
+    },
+    "hwf": {
+      "display": "HWF 手写公式",
+      "family": "HWF",
+      "unit": "expression",
+      "target": "13 符号表达式求值",
+      "order": 2
+    },
+    "mnist-sum5": {
+      "display": "MNIST 5 图求和",
+      "family": "MNIST variable-length sum",
+      "unit": "pair",
+      "target": "5 张数字图之和",
+      "order": 3
+    },
+    "mnist-sum10": {
+      "display": "MNIST 10 图求和",
+      "family": "MNIST variable-length sum",
+      "unit": "pair",
+      "target": "10 张数字图之和",
+      "order": 4
+    },
+    "mnist-sum15": {
+      "display": "MNIST 15 图求和",
+      "family": "MNIST variable-length sum",
+      "unit": "pair",
+      "target": "15 张数字图之和",
+      "order": 5
+    },
+    "abl-hed-equation": {
+      "display": "ABL-HED 四符号方程",
+      "family": "Four-symbol equations",
+      "unit": "equation",
+      "target": "由 0/1/+/= 组成的方程真假",
+      "order": 6
+    }
+  },
+  "metrics": {
+    "task_accuracy": {
+      "display": "任务准确率",
+      "direction": "higher",
+      "definition": "预测结果与整式目标一致的样本数 / 样本总数；MNIST 加法为 pair 级，HWF 为表达式级"
+    },
+    "symbol_accuracy": {
+      "display": "符号准确率",
+      "direction": "higher",
+      "definition": "逐图像 argmax 正确的符号数 / 符号总数；不同分母，不与任务准确率互换"
+    },
+    "equation_accuracy": {
+      "display": "方程判定准确率",
+      "direction": "higher",
+      "definition": "决策层 (probabilities > 0.5) == y 的方程数 / 方程总数；二分类，不是求和任务"
+    }
+  },
+  "baselines": [
+    {
+      "method": "a3bl",
+      "display": "A³BL",
+      "paper": "Ambiguity-Aware Abductive Learning, ICML 2024, PMLR 235:18019-18042, Table 5",
+      "status_csv": {"method": "A³BL", "variant": "mnist-addition-n1"},
+      "blockers": [
+        "保留结果在 E:/date/a3bl（logs/results 为 junction）；E: 不可达时读取失败",
+        "envs/a3bl 为 CPU torch 2.13；论文批次实际使用外部 MSTAR venv + GPU，不能由本环境复跑",
+        "S5 独立完整重载仍 PARTIAL：每次仅 16 表达式"
+      ],
+      "adoptions": [
+        {
+          "label": "Addition seeds 0-4",
+          "parser": "json_fields",
+          "path_template": "E:/date/a3bl/results/paper_v1_addition_seed{seed}_20261023/summary.json",
+          "seeds": [0, 1, 2, 3, 4],
+          "fields": {
+            "task_accuracy": "abl_accuracy_exact",
+            "symbol_accuracy": "character_accuracy_macro_expression"
+          },
+          "task": "mnist-add2",
+          "split": "native-test",
+          "data_protocol": "native-a3bl-addition",
+          "supervision": "sum-only",
+          "selection": "final-epoch-recomputed",
+          "budget": "50 epochs · 30000 训练 / 10000 测试表达式 · seeds 0-4",
+          "note": "整式准确率取 summary.json 的 abl_accuracy_exact（与 reproduction_status.csv 的 reproduction_mean=99.014% 符号准确率不同分母）"
+        },
+        {
+          "label": "HWF seeds 0-4",
+          "parser": "json_fields",
+          "path_template": "E:/date/a3bl/results/paper_v1_hwf_seed{seed}_20261023/summary.json",
+          "seeds": [0, 1, 2, 3, 4],
+          "fields": {
+            "task_accuracy": "abl_accuracy_exact",
+            "symbol_accuracy": "character_accuracy_macro_expression"
+          },
+          "task": "hwf",
+          "split": "native-test",
+          "data_protocol": "native-a3bl-hwf",
+          "supervision": "expression-value",
+          "selection": "final-epoch-recomputed",
+          "budget": "50 epochs · seeds 0-4",
+          "note": "HWF 原生划分与主方法 hwf-label-budget-v1 不同"
+        }
+      ]
+    },
+    {
+      "method": "dolphin",
+      "display": "DOLPHIN",
+      "paper": "DOLPHIN: A Programmable Framework for Scalable Neurosymbolic Learning, ICML 2025, PMLR 267:45461-45483",
+      "status_csv": {"method": "DOLPHIN", "variant": "PAPER__mnist-sum5__damp__seed-0__20261026-155223__a2"},
+      "blockers": [
+        "CUDA 必需（assert torch.cuda.is_available）",
+        "15 epochs、sum_n=5/10/15 由 paper 配置冻结，无 sum2 结果",
+        "逐轮 test 选模（selection_uses_test=true），不是独立 holdout",
+        "dmmp provenance 分支未实现，只有 damp/dtkp-am"
+      ],
+      "adoptions": [
+        {
+          "label": "damp",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum5__damp__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum5",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum5-damp",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 2000 测试 pair · seed 0 · damp",
+          "note": "论文要求 3 trials，本项单 seed"
+        },
+        {
+          "label": "dtkp-am",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum5__dtkp-am__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum5",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum5-dtkp-am",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 2000 测试 pair · seed 0 · dtkp-am",
+          "note": "稳定批；同 seed 诊断运行 37.80% 见 native-RNG 行"
+        },
+        {
+          "label": "damp",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum10__damp__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum10",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum10-damp",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 1000 测试 pair · seed 0 · damp",
+          "note": "damp；论文要求 3 trials，本项单 seed"
+        },
+        {
+          "label": "dtkp-am",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum10__dtkp-am__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum10",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum10-dtkp-am",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 1000 测试 pair · seed 0 · dtkp-am",
+          "note": "dtkp-am 稳定批；同 seed 诊断只对 sum5 做"
+        },
+        {
+          "label": "damp",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum15__damp__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum15",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum15-damp",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 666 测试 pair · seed 0 · damp",
+          "note": "damp；论文要求 3 trials，本项单 seed"
+        },
+        {
+          "label": "dtkp-am",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum15__dtkp-am__seed-0__20261026-155223__a2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum15",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum15-dtkp-am",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch",
+          "budget": "15 epochs · 666 测试 pair · seed 0 · dtkp-am",
+          "note": "dtkp-am 稳定批；同 seed 诊断只对 sum5 做"
+        },
+        {
+          "label": "native-RNG 诊断",
+          "parser": "json_fields",
+          "path": "baselines/dolphin/results/PAPER__mnist-sum5__dtkp-am__seed-0__20261026-164701__native-rng-v2/metrics.json",
+          "fields": {"task_accuracy": "task_accuracy"},
+          "seed": 0,
+          "task": "mnist-sum5",
+          "split": "native-test",
+          "data_protocol": "native-dolphin-sum5-dtkp-am",
+          "supervision": "sum-only",
+          "selection": "max-test-accuracy-at-epoch-native-rng-diagnostic",
+          "budget": "15 epochs · 2000 测试 pair · seed 0 · dtkp-am · 恢复原生 loader RNG",
+          "note": "同 seed 诊断（37.80%），不是第二个 seed，不覆盖稳定的 14.05%"
+        }
+      ]
+    },
+    {
+      "method": "deepproblog",
+      "display": "DeepProbLog",
+      "paper": "DeepProbLog: Neural Probabilistic Logic Programming, NeurIPS 2018",
+      "status_csv": {"method": "DeepProbLog", "variant": "addition_exact_1_4threads"},
+      "blockers": [
+        "上游入口无 argparse、无随机种子固定；两次完整运行只能称单次运行",
+        "缺独立新进程全量重载证据（test_status=PARTIAL）",
+        "只有 CPU exact 引擎；近似引擎缺 SWI/PySwip"
+      ],
+      "adoptions": [
+        {
+          "label": "exact · 单次运行",
+          "parser": "json_fields",
+          "path": "baselines/deepproblog/results/addition_exact_1_4threads.json",
+          "fields": {"task_accuracy": "testing.accuracy"},
+          "task": "mnist-add2",
+          "split": "native-test",
+          "data_protocol": "native-deepproblog-sequential",
+          "supervision": "sum-only",
+          "selection": "single-run-unseeded",
+          "budget": "1 epoch · 30000 训练 / 5000 测试 pair · CPU 4 线程",
+          "note": "第二次完整运行 95.40%（addition_exact_1_4threads_run2.json）只作内部核对；seed 未固定，不进入重复统计"
+        }
+      ]
+    },
+    {
+      "method": "scallop",
+      "display": "Scallop",
+      "paper": "Scallop: A Language for Neurosymbolic Programming, PLDI 2023 / PACMPL 7, Article 166, Figure 15",
+      "status_csv": {"method": "Scallop", "variant": "mnist-sum2-difftopkproofs-k3"},
+      "blockers": [
+        "工程内 baselines/scallop 与 envs/scallop 是空壳；真实副本与解释器在 C:/Users/15841/Desktop/对比实验 与外部 MSTAR venv，不能从本仓库直接复跑",
+        "无 COMMON 清单适配；原生划分固定",
+        "原配置 epoch 9-10 退化到 2.96%；parallel dispatch 会 panic，只能 serial"
+      ],
+      "adoptions": [
+        {
+          "label": "原配置 · 末轮",
+          "parser": "json_fields",
+          "path": "C:/Users/15841/Desktop/对比实验/baselines/scallop/results/formal_completion_summary.json",
+          "fields": {"task_accuracy": "experiments.mnist_full_scale.final_test.accuracy"},
+          "seed": 1234,
+          "task": "mnist-add2",
+          "split": "native-test",
+          "data_protocol": "native-scallop-sum2",
+          "supervision": "sum-only",
+          "selection": "last-epoch-official-protocol",
+          "budget": "10 epochs · 30000 训练 / 5000 测试 pair · seed 1234",
+          "note": "原配置末轮 2.96%；峰值 epoch8 97.96%、test-loss 最低 epoch3 历史 97.78% 均保留，不换成峰值"
+        },
+        {
+          "label": "稳定改动版 · 末轮",
+          "parser": "json_epoch_series",
+          "path": "C:/Users/15841/Desktop/对比实验/baselines/scallop/results/mnist_formal_stable_bce_safe_mstar_cpu/result.json",
+          "list_field": "metrics",
+          "value_field": "accuracy",
+          "select": "last",
+          "metric": "task_accuracy",
+          "seed": 1234,
+          "task": "mnist-add2",
+          "split": "native-test",
+          "data_protocol": "native-scallop-sum2",
+          "supervision": "sum-only",
+          "selection": "last-epoch-stability-variant",
+          "budget": "10 epochs · 30000 训练 / 5000 测试 pair · seed 1234 · 稳定改动版",
+          "note": "BCE-safe / lr1e-4 / cosine；末轮 98.02%、峰值 epoch8 98.04%；不是原配置，不覆盖 2.96%"
+        },
+        {
+          "label": "HWF 原配置 · 末轮",
+          "parser": "json_fields",
+          "path": "C:/Users/15841/Desktop/对比实验/baselines/scallop/results/formal_completion_summary.json",
+          "fields": {"task_accuracy": "experiments.hwf.final_test.accuracy"},
+          "seed": 1234,
+          "task": "hwf",
+          "split": "native-test",
+          "data_protocol": "native-scallop-hwf",
+          "supervision": "expression-value",
+          "selection": "last-epoch-official-protocol",
+          "budget": "100 epochs · 2000 测试表达式 · seed 1234 · k3 sample7",
+          "note": "原配置末轮 97.35%；峰值 97.60%；与主方法 hwf 划分不同"
+        }
+      ]
+    },
+    {
+      "method": "abl_hed",
+      "display": "ABL-HED",
+      "paper": "ABL-HED (AbductiveLearning/ABL-HED；README 指向 NeurIPS 2019 Bridging Machine Learning and Logical Reasoning by Abductive Learning)",
+      "status_csv": {"method": "ABL-HED", "variant": "cpu-formal-mnist_images-short-seed0-20261025-021047"},
+      "blockers": [
+        "GPU 入口硬编码 WSL2 绝对路径与 GPU 强制检查，不能从 Windows 直接复跑；CPU all 规模未完成",
+        "四符号方程任务与两图十进制加法不可互换，metric 为方程二分类",
+        "三个 decision trial 共享同一 seed，不是三个 seed"
+      ],
+      "adoptions": [
+        {
+          "label": "DBA-short",
+          "parser": "formal_test_aggregate",
+          "path": "baselines/abl-hed/results/cpu-formal-mnist_images-short-seed0-20261025-021047/metrics.json",
+          "metric": "equation_accuracy",
+          "seed": 0,
+          "task": "abl-hed-equation",
+          "split": "native-test",
+          "data_protocol": "abl-hed-mnist_images-short",
+          "supervision": "equation-label",
+          "selection": "three-trials-mean",
+          "budget": "3 decision trials × 22 lengths × 600 方程 · seed 0",
+          "note": "CPU；3 trials 共享 seed 0"
+        },
+        {
+          "label": "RBA-short",
+          "parser": "formal_test_aggregate",
+          "path": "baselines/abl-hed/results/cpu-formal-random_images-short-seed0-20261025-112948/metrics.json",
+          "metric": "equation_accuracy",
+          "seed": 0,
+          "task": "abl-hed-equation",
+          "split": "native-test",
+          "data_protocol": "abl-hed-random_images-short",
+          "supervision": "equation-label",
+          "selection": "three-trials-mean",
+          "budget": "3 decision trials × 22 lengths × 600 方程 · seed 0",
+          "note": "CPU；3 trials 共享 seed 0"
+        },
+        {
+          "label": "DBA-all",
+          "parser": "formal_test_aggregate",
+          "path": "baselines/abl-hed/results/gpu-formal-mnist_images-all-seed0-20261026-100058/metrics.json",
+          "metric": "equation_accuracy",
+          "seed": 0,
+          "task": "abl-hed-equation",
+          "split": "native-test",
+          "data_protocol": "abl-hed-mnist_images-all",
+          "supervision": "equation-label",
+          "selection": "three-trials-mean",
+          "budget": "3 decision trials × 22 lengths × 600 方程 · seed 0",
+          "note": "WSL2 GPU/TF2"
+        },
+        {
+          "label": "RBA-all",
+          "parser": "formal_test_aggregate",
+          "path": "baselines/abl-hed/results/gpu-formal-random_images-all-seed0-cache-20261026-112514/metrics.json",
+          "metric": "equation_accuracy",
+          "seed": 0,
+          "task": "abl-hed-equation",
+          "split": "native-test",
+          "data_protocol": "abl-hed-random_images-all",
+          "supervision": "equation-label",
+          "selection": "three-trials-mean",
+          "budget": "3 decision trials × 22 lengths × 600 方程 · seed 0",
+          "note": "WSL2 GPU/TF2，exact logic cache"
+        }
+      ]
+    }
+  ]
+}

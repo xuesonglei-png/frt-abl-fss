@@ -1,0 +1,54 @@
+{
+  "protocol_version": "frt-abl-sensitivity-v1",
+  "baseline": {
+    "method_version": "frt-abl-v10-20261028",
+    "variant": "full",
+    "configs": [
+      "methods/frt_abl/configs/mnist.json",
+      "methods/frt_abl/configs/hwf.json"
+    ]
+  },
+  "seeds": [4],
+  "output_root": "methods/frt_abl/runs-sensitivity-v10",
+  "summary_root": "methods/frt_abl/runs-summary-sensitivity-v10",
+  "factors": {
+    "knn_k": {
+      "levels": [1, 3, 10, 20, 40],
+      "why": "Neighbours kept in the structure-restricted fuzzy relation. 1 is a single best neighbour (near-reflexive), 40 is a dense bank; 10 is the frozen baseline."
+    },
+    "graph_sigma": {
+      "levels": [0.1, 0.25, 0.5, 1.0, 2.0],
+      "why": "Bandwidth of r=exp(-d/(2 sigma^2)); unit-norm representations give d in [0,4], so 0.1 keeps near-duplicates only and 2.0 is a broad neighbourhood. 0.5 is the frozen baseline."
+    },
+    "risk_limit": {
+      "levels": [0.02, 0.05, 0.1, 0.2, 0.3],
+      "why": "Held-out Wilson risk ceiling of the alpha gate (stricter gate -> higher alpha -> fewer accepted positives). 0.1 is the frozen baseline."
+    },
+    "curriculum_ramp_rounds": {
+      "levels": [2, 5, 10, 20, 40],
+      "why": "Rounds until the soft curriculum reaches full weight. 2 is very fast, 10 is the frozen baseline, 40 is slower than the 30-round MNIST horizon."
+    },
+    "full_boundary_weight": {
+      "levels": [0.0, 0.5, 1.0, 2.0, 3.0],
+      "relative": true,
+      "why": "Boundary KL weight as a multiple of the frozen per-task value (MNIST 0.1, HWF 0.2). 0.0 keeps the boundary set but removes its loss term, which is not the same as the no_boundary ablation."
+    },
+    "curriculum_min_weight": {
+      "levels": [0.2, 0.35, 0.5, 0.75, 0.9],
+      "optional": true,
+      "why": "Optional secondary curriculum knob: initial soft-curriculum weight (curriculum strength). Not swept by default; requires --factors curriculum_min_weight."
+    }
+  },
+  "analysis": {
+    "accuracy_margin": 0.005,
+    "coverage_tolerance": 0.05,
+    "min_block_levels": 3,
+    "min_block_span": 0.5
+  },
+  "notes": [
+    "One factor at a time: every arm changes exactly one frozen-v10 full parameter, and the baseline arm is retrained inside the same campaign.",
+    "The grid is predeclared and contains the frozen baseline value; arms are never added after inspecting results.",
+    "Stage A screens with the design seed (4); stage B re-runs the baseline plus an interesting subset with seeds 0-4 and is the only admissible confirmation.",
+    "Formal test is never read by this protocol; train.py only trains and selects on validation."
+  ]
+}
